@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <!-- TargetFramework: Specifies the .NET version. .NET 8 is current as of this writing. -->
+    <!-- Ensure the .NET SDK version used to build matches this. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- ServiceWorkerAssetsManifest is for PWA, not needed for a browser extension popup. -->
+    <!-- <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest> -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core package for Blazor WebAssembly applications. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.0" />
+    <!-- Development server package, useful during local development. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!--
+      Configuration for deploying as part of a Chrome Extension:
+      - OutputPath: Directs the `dotnet publish` output to a structure that's easy to copy into the extension.
+        The published files will be in `bin/Release/net8.0/publish/wwwroot/`.
+        The content of this `wwwroot` (including `_framework` and `YourApp.styles.css`)
+        should be copied to the extension's root `wwwroot` directory.
+      - StaticWebAssetBasePath: Tells Blazor that the app is hosted at the root of the `wwwroot` directory.
+        This is important for resolving static assets like CSS and JS correctly.
+    -->
+    <OutputPath>bin\$(Configuration)\$(TargetFramework)\publish\wwwroot\</OutputPath>
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+    <!-- Ensure static web assets (like CSS isolation files YourApp.styles.css) are copied to the publish directory -->
+    <CopyRazorGenerateFilesToPublishDirectory>true</CopyRazorGenerateFilesToPublishDirectory>
+  </PropertyGroup>
+
+</Project>

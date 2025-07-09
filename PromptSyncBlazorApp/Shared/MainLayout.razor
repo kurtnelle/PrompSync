@@ -1,0 +1,38 @@
+@inherits LayoutComponentBase
+
+<div class="page-container">
+    <main role="main" class="pb-3">
+        @* The @Body directive renders the content of the current page *@
+        @Body
+    </main>
+</div>
+
+<style>
+    /*
+      Styles for MainLayout.razor - this defines the overall structure of the popup.
+      These styles are scoped to this component if using CSS isolation (MainLayout.razor.css),
+      or global if placed directly in a <style> tag like this or in wwwroot/css/app.css.
+      For simplicity in this manual setup, placing some critical layout styles here.
+    */
+
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        /* Standard Chrome extension popup width is typically between 300px and 800px for width,
+           and up to 600px for height (though it can be scrollable). */
+        width: 320px; /* A bit more space than the strict minimum */
+        /* Max height is governed by Chrome, but we can set a desired height.
+           The content itself will scroll if it exceeds this. */
+        max-height: 580px; /* Max allowed by Chrome without scrollbars on the popup window itself */
+        overflow: hidden; /* Prevent the main layout itself from showing scrollbars */
+        font-size: 14px; /* Base font size for the popup */
+    }
+
+    main {
+        flex-grow: 1; /* Allows the main content area to fill available vertical space */
+        overflow-y: auto; /* Adds a scrollbar if content overflows vertically */
+        padding: 15px; /* Padding around the content rendered by @Body */
+    }
+
+    /* General styling for elements within the popup can go into wwwroot/css/app.css */
+</style>
