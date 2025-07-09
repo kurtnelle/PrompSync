@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "PromptSync",
+  "version": "0.1.0",
+  "description": "Sync prompts from ChatGPT to other services.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://chat.openai.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chat.openai.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "wwwroot/index.html",
+    "default_title": "PromptSync"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "wwwroot/*",        Ensures all files in wwwroot (like index.html, css, js) are accessible.
+        "_framework/*"      Crucial for Blazor: allows loading of .dll, .wasm, and other Blazor runtime files.
+      ],
+      "matches": ["<all_urls>"] /* Allows any webpage to load these resources if it knows the extension ID.
+                                   More restrictive matching (e.g., specific domains) could be used if needed,
+                                   but for Blazor Wasm assets, broad access is typical for extensions. */
+    }
+  ]
+}

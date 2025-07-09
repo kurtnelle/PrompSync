@@ -1,0 +1,229 @@
+@page "/"
+@* This directive makes this component the default page for the Blazor app. *@
+
+@inject IJSRuntime JSRuntime
+@* Injects the JavaScript runtime to call JavaScript functions from C#. *@
+
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@* Usings for JSON serialization/deserialization. *@
+
+<div class="popup-header">
+    <h3>PromptSync</h3>
+</div>
+
+<button class="btn btn-primary btn-sm mb-2" @onclick="LoadDataFromStorage" disabled="@isLoading">
+    @if (isLoading) { <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> }
+    Refresh Data
+</button>
+
+@if (isLoading && latestPrompt == null) // Show initial loading message only if no data yet
+{
+    <p class="loading-message"><em>Loading last detected prompt...</em></p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        <strong>Error:</strong> @errorMessage
+    </div>
+}
+else if (latestPrompt != null)
+{
+    <div class="prompt-container card">
+        <div class="card-header">
+            <strong>Last Detected Prompt</strong>
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(latestPrompt.Tag))
+            {
+                <p class="metadata-display"><strong>Tag:</strong> <code>@latestPrompt.Tag</code></p>
+            }
+            @if (!string.IsNullOrEmpty(latestPrompt.Repo))
+            {
+                <p class="metadata-display"><strong>Repository:</strong> <code>@latestPrompt.Repo</code></p>
+            }
+            @if (!string.IsNullOrEmpty(latestPrompt.Branch))
+            {
+                <p class="metadata-display"><strong>Branch:</strong> <code>@latestPrompt.Branch</code></p>
+            }
+            @if (!string.IsNullOrEmpty(latestPrompt.Timestamp))
+            {
+                <p class="metadata-display"><strong>Detected:</strong> @FormatTimestamp(latestPrompt.Timestamp)</p>
+            }
+
+            <h5>Extracted Content:</h5>
+            @if (!string.IsNullOrEmpty(latestPrompt.ExtractedContent))
+            {
+                <div class="prompt-display-area">
+                    @* Render newlines as <br> tags for proper display in HTML. *@
+                    @((MarkupString)System.Web.HttpUtility.HtmlEncode(latestPrompt.ExtractedContent).Replace("\n", "<br />"))
+                </div>
+            }
+            else
+            {
+                <p><em>(No content was extracted for this prompt.)</em></p>
+            }
+        </div>
+    </div>
+    @*
+    <div class="mt-3">
+        <button class="btn btn-success btn-sm" @onclick="SendToApi" disabled="@(latestPrompt == null)">
+            Send to Backend API (Placeholder)
+        </button>
+    </div>
+    *@
+}
+else
+{
+    <div class="alert alert-info" role="alert">
+        No prompt data found in local storage.
+        Try navigating to a ChatGPT page and generate content with a <code>&lt;!--PUSH:...--&gt;</code> tag.
+    </div>
+}
+
+@code {
+    private LatestPromptData? latestPrompt; // Holds the deserialized data from storage.
+    private string? errorMessage;           // Stores any error message for display.
+    private bool isLoading = true;          // Tracks the loading state.
+
+    /// <summary>
+    /// Lifecycle method called when the component is initialized.
+    /// Fetches data from storage when the popup opens.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("PromptSync Popup: Initializing Index.razor component.");
+        await LoadDataFromStorage();
+    }
+
+    /// <summary>
+    /// Loads data from chrome.storage.local using JSInterop.
+    /// </summary>
+    private async Task LoadDataFromStorage()
+    {
+        isLoading = true;
+        errorMessage = null; // Clear previous errors
+        StateHasChanged(); // Update UI to show loading state
+
+        try
+        {
+            Console.WriteLine("PromptSync Popup: Attempting to load data via JSInterop 'chromeStorage.getLocal'.");
+            // Calls the 'getLocal' function in wwwroot/js/chromeStorage.js.
+            // The key "latestPromptData" matches what's set in background.js.
+            var resultJson = await JSRuntime.InvokeAsync<string?>("chromeStorage.getLocal", "latestPromptData");
+
+            if (!string.IsNullOrEmpty(resultJson))
+            {
+                Console.WriteLine($"PromptSync Popup: Received JSON from storage: {resultJson}");
+                // Deserialize the JSON string into our C# model.
+                // PropertyNameCaseInsensitive is good practice for JS interop.
+                latestPrompt = JsonSerializer.Deserialize<LatestPromptData>(resultJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (latestPrompt == null)
+                {
+                   // This can happen if the stored value was explicitly 'null' (string) or deserialization failed to map.
+                   Console.WriteLine("PromptSync Popup: Deserialized latestPromptData is null, but JSON string was not empty. Check JSON structure/content.");
+                   // Potentially set an error message or treat as no data.
+                }
+                else
+                {
+                    Console.WriteLine("PromptSync Popup: Successfully deserialized prompt data.");
+                }
+            }
+            else
+            {
+                latestPrompt = null; // No data found or the stored value was null.
+                Console.WriteLine("PromptSync Popup: No data (or null value) found in chrome.storage.local for 'latestPromptData'.");
+            }
+        }
+        catch (JSException jsEx) // Errors from JavaScript calls (e.g., chromeStorage.js)
+        {
+            errorMessage = $"JavaScript Error: {jsEx.Message}. Ensure 'chromeStorage.js' is loaded and Chrome APIs are available.";
+            Console.Error.WriteLine($"PromptSync Popup: JSException while loading data: {jsEx}");
+        }
+        catch (JsonException jsonEx) // Errors during JSON deserialization
+        {
+            errorMessage = $"Data Format Error: {jsonEx.Message}. The stored data might be corrupted.";
+            Console.Error.WriteLine($"PromptSync Popup: JsonException while deserializing data: {jsonEx}");
+        }
+        catch (Exception ex) // Other unexpected errors
+        {
+            errorMessage = $"An unexpected error occurred: {ex.Message}";
+            Console.Error.WriteLine($"PromptSync Popup: Generic exception while loading data: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged(); // Update UI to reflect loaded data or errors.
+            Console.WriteLine("PromptSync Popup: LoadDataFromStorage finished.");
+        }
+    }
+
+    /// <summary>
+    /// Represents the structure of the data stored by background.js and expected by this page.
+    /// JsonPropertyName attributes map C# property names to JSON keys (case-insensitively due to options).
+    /// </summary>
+    public class LatestPromptData
+    {
+        [JsonPropertyName("rawBlockContent")]
+        public string? RawBlockContent { get; set; }
+
+        [JsonPropertyName("extractedContent")]
+        public string? ExtractedContent { get; set; }
+
+        [JsonPropertyName("tag")]
+        public string? Tag { get; set; }
+
+        [JsonPropertyName("repo")]
+        public string? Repo { get; set; }
+
+        [JsonPropertyName("branch")]
+        public string? Branch { get; set; }
+
+        [JsonPropertyName("timestamp")]
+        public string? Timestamp { get; set; } // ISO 8601 string
+    }
+
+    /// <summary>
+    /// Formats the ISO timestamp string into a more readable format.
+    /// </summary>
+    private string FormatTimestamp(string? isoTimestamp)
+    {
+        if (string.IsNullOrEmpty(isoTimestamp) || !DateTime.TryParse(isoTimestamp, out DateTime dt))
+        {
+            return "N/A";
+        }
+        return dt.ToLocalTime().ToString("g"); // General date/time pattern (short time)
+    }
+
+    // Placeholder for a future function to send data to a backend API.
+    // private async Task SendToApi()
+    // {
+    //     if (latestPrompt != null && !string.IsNullOrEmpty(latestPrompt.ExtractedContent))
+    //     {
+    //         isLoading = true;
+    //         errorMessage = null;
+    //         StateHasChanged();
+    //         try
+    //         {
+    //             // Example: using a hypothetical service injected or HttpClient directly
+    //             // var client = HttpClientFactory.CreateClient(); // If using IHttpClientFactory
+    //             // await client.PostAsJsonAsync("YOUR_BACKEND_API_ENDPOINT", latestPrompt);
+    //             Console.WriteLine("Simulating API call with data: " + latestPrompt.ExtractedContent);
+    //             await Task.Delay(1000); // Simulate network latency
+    //             // Handle success: maybe clear the prompt or show a success message
+    //         }
+    //         catch(Exception ex)
+    //         {
+    //             errorMessage = "Failed to send data to API: " + ex.Message;
+    //             Console.Error.WriteLine("PromptSync Popup: Error sending to API: " + ex);
+    //         }
+    //         finally
+    //         {
+    //             isLoading = false;
+    //             StateHasChanged();
+    //         }
+    //     }
+    // }
+}
